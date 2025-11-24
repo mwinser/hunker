@@ -14,8 +14,9 @@ export function createLoop(args: {
   player: Player
   input: Input
   stats: StatsOverlay
+  serverUrl: string
 }) {
-  const { renderer, scene, camera, physics, player, input, stats } = args
+  const { renderer, scene, camera, physics, player, input, stats, serverUrl } = args
 
   const stepHz = 60
   const fixedDt = 1 / stepHz
@@ -29,7 +30,7 @@ export function createLoop(args: {
 
   // networking
   const net = createNet()
-  net.connect()
+  net.connect(serverUrl)
   const remotes = new Map<string, ReturnType<typeof import('./remotes').createRemoteNode>>() as any
 
   function frame() {

@@ -13,17 +13,19 @@
   - Smooth, jitter-free camera/control; reliable ground detection; no clipping/rubberbanding locally.
   - Consistent damage on targets; frame-time within budget; no major GC spikes.
 
-### Phase 2 — Two-computer multiplayer connectivity test
-- **objective**: Connect two browsers and synchronize player transforms with prediction/reconciliation.
+### Phase 2 — Two-computer multiplayer connectivity test (same network)
+- **objective**: Connect two browsers on the same WiFi network and synchronize player transforms with prediction/reconciliation.
 - **core tasks**:
   - Stand up minimal authoritative server (Node.js + TypeScript; Colyseus or custom) with tick @ 30–60 Hz.
   - Networking: WebRTC DataChannel (with simple signaling + STUN/TURN) or WebSocket fallback.
+  - Local network discovery: server broadcasts/listens on local IP (e.g., via mDNS/Bonjour or manual IP entry); clients can discover or connect via host's local IP address.
   - Client prediction for local movement; server reconciliation; remote interpolation.
   - Replicate essentials: player transform, input sequence numbers, join/leave; debug net HUD (RTT, loss, snapshot rate).
   - Basic error handling: reconnect, room rejoin, version mismatch guard.
-- **deliverable**: Two separate machines see each other move smoothly in the same room over the network.
+- **deliverable**: Two separate machines on the same WiFi network can discover/connect and see each other move smoothly in the same room.
 - **acceptance**:
   - Under ~100 ms RTT, remote motion appears smooth with minimal snapping; local motion feels unchanged.
   - Clean connect/disconnect flows; no desync after 5+ minutes of movement.
+  - Clients on the same WiFi network can successfully discover or manually connect to the game server.
 
 

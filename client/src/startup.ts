@@ -5,13 +5,27 @@ import { createInput } from './systems/input'
 import { createPhysicsWorld } from './systems/physics'
 import { createPlayer } from './systems/player'
 import { createLoop } from './systems/loop'
+import { createConnectionUI } from './systems/connection-ui'
 
-export function bootstrap(): void {
+export async function bootstrap(): Promise<void> {
   const appRoot = document.querySelector<HTMLDivElement>('#app')
   if (!appRoot) {
     throw new Error('Missing #app root element')
   }
 
+  appRoot.innerHTML = ''
+
+  // Show connection UI first
+  const connectionUI = createConnectionUI(appRoot)
+  const serverUrl = await connectionUI.show()
+
+  if (!serverUrl) {
+    // User cancelled connection
+    appRoot.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; color: #fff; font-family: system-ui;">Connection cancelled. Refresh to try again.</div>'
+    return
+  }
+
+  // Clear the UI and start the game
   appRoot.innerHTML = ''
 
   const scene = new Scene()
@@ -37,7 +51,7 @@ export function bootstrap(): void {
     scene.add(player.mesh)
 
     const stats = createStatsOverlay(appRoot)
-    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats })
+    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl })
     loop.start()
   })
 }

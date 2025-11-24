@@ -1,4 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
+import { networkInterfaces } from 'os'
+// @ts-ignore - bonjour is CommonJS
+import Bonjour from 'bonjour'
 
 type Client = {
   ws: WebSocket
@@ -13,8 +16,26 @@ type ClientMsg =
   | { t: 'hello' }
   | { t: 'state'; x: number; y: number; z: number; yaw: number }
 
-const wss = new WebSocketServer({ port: Number(process.env.PORT ?? 8787) })
+const PORT = Number(process.env.PORT ?? 8787)
+const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT })
 const clients = new Map<string, Client>()
+
+// Get local IP addresses
+function getLocalIPs(): string[] {
+  const interfaces = networkInterfaces()
+  const ips: string[] = []
+  for (const name of Object.keys(interfaces)) {
+    const nets = interfaces[name]
+    if (!nets) continue
+    for (const net of nets) {
+      // Skip internal (loopback) and non-IPv4 addresses
+      if (net.family === 'IPv4' && !net.internal) {
+        ips.push(net.address)
+      }
+    }
+  }
+  return ips
+}
 
 function broadcast(obj: ServerMsg) {
   const data = JSON.stringify(obj)
@@ -53,6 +74,38 @@ wss.on('connection', (ws) => {
 
 setInterval(snapshot, 1000 / 15) // broadcast 15Hz snapshots
 
-console.log('WebSocket server listening on port', (wss.options.port as number) ?? 8787)
+// Start mDNS/Bonjour service for automatic discovery
+const bonjour = Bonjour()
+const service = bonjour.publish({
+  name: 'Hunker Game Server',
+  type: 'hunker-ws',
+  port: PORT,
+  protocol: 'tcp',
+})
+
+// Display server information
+const localIPs = getLocalIPs()
+console.log('\n=== Game Server Started ===')
+console.log(`Port: ${PORT}`)
+console.log('\nConnect from other devices on the same network using:')
+if (localIPs.length > 0) {
+  localIPs.forEach((ip) => {
+    console.log(`  ws://${ip}:${PORT}`)
+  })
+} else {
+  console.log('  (No network interfaces found)')
+}
+console.log('\nLocal connections:')
+console.log(`  ws://localhost:${PORT}`)
+console.log('\nmDNS/Bonjour: Server is discoverable as "Hunker Game Server"')
+console.log('========================\n')
+
+// Cleanup on exit
+process.on('SIGINT', () => {
+  bonjour.unpublishAll(() => {
+    bonjour.destroy()
+    process.exit(0)
+  })
+})
 
 

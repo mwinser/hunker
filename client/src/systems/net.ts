@@ -20,7 +20,18 @@ export function createNet(): Net {
   let lastPingSentAt = 0
 
   const connect = (url?: string) => {
-    const target = url ?? `ws://localhost:8787`
+    if (!url) {
+      console.warn('Net.connect() called without URL. Use connection UI to get URL first.')
+      return
+    }
+    
+    // Close existing connection if any
+    if (ws) {
+      ws.close()
+      ws = null
+    }
+
+    const target = url
     ws = new WebSocket(target)
     ws.onopen = () => {
       // simple keepalive/ping to estimate RTT
@@ -39,9 +50,15 @@ export function createNet(): Net {
         }
       } catch {}
     }
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
     ws.onclose = () => {
       ws = null
-      setTimeout(() => connect(url), 1000)
+      // Only auto-reconnect if we had a successful connection
+      if (id) {
+        setTimeout(() => connect(url), 1000)
+      }
     }
   }
 
