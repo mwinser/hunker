@@ -48,6 +48,8 @@ export function createLoop(args: {
     labelRenderer.domElement.style.top = '0'
     labelRenderer.domElement.style.left = '0'
     labelRenderer.domElement.style.pointerEvents = 'none'
+    labelRenderer.domElement.style.zIndex = '10'
+    labelRenderer.domElement.style.overflow = 'visible'
     container.appendChild(labelRenderer.domElement)
     window.addEventListener('resize', resizeLabelRenderer)
     resizeLabelRenderer()

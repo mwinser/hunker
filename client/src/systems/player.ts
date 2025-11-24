@@ -72,18 +72,23 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
   // Create username label for local player
   const labelDiv = document.createElement('div')
   labelDiv.textContent = username
+  labelDiv.className = 'player-username-label'
   labelDiv.style.cssText = `
-    color: #fff;
-    font-family: system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 4px 8px;
-    border-radius: 4px;
-    white-space: nowrap;
-    pointer-events: none;
-    user-select: none;
-    text-align: center;
+    color: #ffffff !important;
+    font-family: system-ui, sans-serif !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    padding: 8px 16px !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    text-align: center !important;
+    display: block !important;
+    line-height: 1.2 !important;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
   `
   const label = new CSS2DObject(labelDiv)
   label.position.set(0, 1.8, 0) // Position above the avatar
