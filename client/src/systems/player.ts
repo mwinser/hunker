@@ -1,4 +1,5 @@
 import { PerspectiveCamera, Group, Vector3, Quaternion } from 'three'
+import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { CharacterController, Physics } from './physics'
 import { createCapsuleCharacter } from './physics'
 import type { Input } from './input'
@@ -8,8 +9,8 @@ export type Player = {
   update: (dt: number) => void
 }
 
-export function createPlayer(args: { scene: import('three').Scene; camera: PerspectiveCamera; physics: Physics; input: Input }): Player {
-  const { camera, physics, input } = args
+export function createPlayer(args: { scene: import('three').Scene; camera: PerspectiveCamera; physics: Physics; input: Input; username: string }): Player {
+  const { camera, physics, input, username } = args
 
   const playerRoot = new Group()
   playerRoot.name = 'PlayerRoot'
@@ -67,6 +68,26 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
   }
 
   playerRoot.add(camera)
+
+  // Create username label for local player
+  const labelDiv = document.createElement('div')
+  labelDiv.textContent = username
+  labelDiv.style.cssText = `
+    color: #fff;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    text-align: center;
+  `
+  const label = new CSS2DObject(labelDiv)
+  label.position.set(0, 1.8, 0) // Position above the avatar
+  playerRoot.add(label)
 
   return { mesh: playerRoot, update }
 }

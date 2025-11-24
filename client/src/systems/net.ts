@@ -1,12 +1,12 @@
 export type Snapshot = {
-  players: Record<string, { x: number; y: number; z: number; yaw: number }>
+  players: Record<string, { x: number; y: number; z: number; yaw: number; username: string }>
 }
 
 export type Net = {
   id: string | null
   peers: number
   rttMs: number | null
-  connect: (url?: string) => void
+  connect: (url?: string, username?: string) => void
   sendState: (s: { x: number; y: number; z: number; yaw: number }) => void
   getLatestSnapshot: () => Snapshot | null
 }
@@ -19,7 +19,7 @@ export function createNet(): Net {
   let rttMs: number | null = null
   let lastPingSentAt = 0
 
-  const connect = (url?: string) => {
+  const connect = (url?: string, username?: string) => {
     if (!url) {
       console.warn('Net.connect() called without URL. Use connection UI to get URL first.')
       return
@@ -36,7 +36,7 @@ export function createNet(): Net {
     ws.onopen = () => {
       // simple keepalive/ping to estimate RTT
       lastPingSentAt = performance.now()
-      ws?.send(JSON.stringify({ t: 'hello' }))
+      ws?.send(JSON.stringify({ t: 'hello', username: username || 'Player' }))
     }
     ws.onmessage = (ev) => {
       try {

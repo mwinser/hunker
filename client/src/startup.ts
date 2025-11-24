@@ -17,13 +17,15 @@ export async function bootstrap(): Promise<void> {
 
   // Show connection UI first
   const connectionUI = createConnectionUI(appRoot)
-  const serverUrl = await connectionUI.show()
+  const connectionResult = await connectionUI.show()
 
-  if (!serverUrl) {
+  if (!connectionResult) {
     // User cancelled connection
     appRoot.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; color: #fff; font-family: system-ui;">Connection cancelled. Refresh to try again.</div>'
     return
   }
+
+  const { url: serverUrl, username } = connectionResult
 
   // Clear the UI and start the game
   appRoot.innerHTML = ''
@@ -47,11 +49,11 @@ export async function bootstrap(): Promise<void> {
   const input = createInput(appRoot)
 
   physics.ready.then(() => {
-    const player = createPlayer({ scene, camera, physics, input })
+    const player = createPlayer({ scene, camera, physics, input, username })
     scene.add(player.mesh)
 
     const stats = createStatsOverlay(appRoot)
-    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl })
+    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl, username })
     loop.start()
   })
 }

@@ -1,4 +1,5 @@
 import { PerspectiveCamera, Scene, WebGLRenderer } from 'three'
+import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { Physics } from './physics'
 import type { Player } from './player'
 import type { Input } from './input'
@@ -15,8 +16,9 @@ export function createLoop(args: {
   input: Input
   stats: StatsOverlay
   serverUrl: string
+  username: string
 }) {
-  const { renderer, scene, camera, physics, player, input, stats, serverUrl } = args
+  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username } = args
 
   const stepHz = 60
   const fixedDt = 1 / stepHz
@@ -30,8 +32,26 @@ export function createLoop(args: {
 
   // networking
   const net = createNet()
-  net.connect(serverUrl)
+  net.connect(serverUrl, username)
   const remotes = new Map<string, ReturnType<typeof import('./remotes').createRemoteNode>>() as any
+
+  // CSS2D renderer for username labels
+  const labelRenderer = new CSS2DRenderer()
+  const container = renderer.domElement.parentElement
+  if (container) {
+    const resizeLabelRenderer = () => {
+      const w = container.clientWidth || window.innerWidth
+      const h = container.clientHeight || window.innerHeight
+      labelRenderer.setSize(w, h)
+    }
+    labelRenderer.domElement.style.position = 'absolute'
+    labelRenderer.domElement.style.top = '0'
+    labelRenderer.domElement.style.left = '0'
+    labelRenderer.domElement.style.pointerEvents = 'none'
+    container.appendChild(labelRenderer.domElement)
+    window.addEventListener('resize', resizeLabelRenderer)
+    resizeLabelRenderer()
+  }
 
   function frame() {
     if (!running) return
@@ -49,12 +69,22 @@ export function createLoop(args: {
       net.sendState({ x: pos.x, y: pos.y, z: pos.z, yaw })
       // remotes integrate
       const snap = net.getLatestSnapshot()
-      if (snap) updateRemotes(remotes as any, snap.players, scene)
+      if (snap && net.id) {
+        // Filter out local player from remotes
+        const remotePlayers: Record<string, { x: number; y: number; z: number; yaw: number; username: string }> = {}
+        for (const [id, player] of Object.entries(snap.players)) {
+          if (id !== net.id) {
+            remotePlayers[id] = player
+          }
+        }
+        updateRemotes(remotes as any, remotePlayers, scene)
+      }
       simulateRemotes(remotes as any, fixedDt)
       accumulator -= fixedDt
     }
 
     renderer.render(scene, camera)
+    labelRenderer.render(scene, camera)
     input.resetPerFrame()
 
     // HUD

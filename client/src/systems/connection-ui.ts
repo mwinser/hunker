@@ -1,13 +1,13 @@
 export type ConnectionUI = {
-  show: () => Promise<string | null>
+  show: () => Promise<{ url: string; username: string } | null>
   hide: () => void
 }
 
 export function createConnectionUI(container: HTMLElement): ConnectionUI {
-  let resolveConnection: ((url: string | null) => void) | null = null
+  let resolveConnection: ((result: { url: string; username: string } | null) => void) | null = null
   let dialog: HTMLDivElement | null = null
 
-  const show = (): Promise<string | null> => {
+  const show = (): Promise<{ url: string; username: string } | null> => {
     return new Promise((resolve) => {
       resolveConnection = resolve
 
@@ -41,6 +41,24 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
 
       const form = document.createElement('div')
       form.style.cssText = 'display: flex; flex-direction: column; gap: 1rem;'
+
+      // Username input
+      const usernameLabel = document.createElement('label')
+      usernameLabel.textContent = 'Username:'
+      usernameLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 500;'
+
+      const usernameInput = document.createElement('input')
+      usernameInput.type = 'text'
+      usernameInput.placeholder = 'Enter your username'
+      usernameInput.value = `Player${Math.floor(Math.random() * 1000)}`
+      usernameInput.style.cssText = `
+        padding: 0.75rem;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background: #0a0a0a;
+        color: #fff;
+        font-size: 1rem;
+      `
 
       // Manual IP input
       const ipLabel = document.createElement('label')
@@ -132,14 +150,18 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
         const ip = ipInput.value.trim() || 'localhost'
         const port = portInput.value.trim() || '8787'
         const url = `ws://${ip}:${port}`
+        const username = usernameInput.value.trim() || `Player${Math.floor(Math.random() * 1000)}`
         if (resolveConnection) {
-          resolveConnection(url)
+          resolveConnection({ url, username })
           resolveConnection = null
         }
         hide()
       }
 
       connectBtn.onclick = handleConnect
+      usernameInput.onkeydown = (e) => {
+        if (e.key === 'Enter') handleConnect()
+      }
       ipInput.onkeydown = (e) => {
         if (e.key === 'Enter') handleConnect()
       }
@@ -171,6 +193,8 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
       tryDiscovery()
 
       // Assemble form
+      form.appendChild(usernameLabel)
+      form.appendChild(usernameInput)
       form.appendChild(ipLabel)
       form.appendChild(ipInput)
       form.appendChild(portLabel)
@@ -188,7 +212,7 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
       container.appendChild(dialog)
 
       // Focus input
-      setTimeout(() => ipInput.focus(), 100)
+      setTimeout(() => usernameInput.focus(), 100)
     })
   }
 
