@@ -13,7 +13,7 @@
   - Smooth, jitter-free camera/control; reliable ground detection; no clipping/rubberbanding locally.
   - Consistent damage on targets; frame-time within budget; no major GC spikes.
 
-### Phase 2 — Two-computer multiplayer connectivity test (same network)
+### Phase 2 — Two-computer multiplayer connectivity test (same network) ✅ **COMPLETED**
 - **objective**: Connect two browsers on the same WiFi network and synchronize player transforms with prediction/reconciliation.
 - **core tasks**:
   - Stand up minimal authoritative server (Node.js + TypeScript; Colyseus or custom) with tick @ 30–60 Hz.
@@ -27,5 +27,20 @@
   - Under ~100 ms RTT, remote motion appears smooth with minimal snapping; local motion feels unchanged.
   - Clean connect/disconnect flows; no desync after 5+ minutes of movement.
   - Clients on the same WiFi network can successfully discover or manually connect to the game server.
+
+### Phase 3 — Gameplay systems and content
+- **objective**: Add core gameplay mechanics, zombie AI, and survival elements.
+- **core tasks**:
+  - Zombie AI: pathfinding, spawn system, basic behaviors (patrol, chase, attack).
+  - Health/damage system: player health, zombie health, death/respawn mechanics.
+  - Weapon variety: multiple weapon types, ammo system, reload mechanics.
+  - Survival elements: resource gathering, crafting, base building (optional).
+  - Wave/spawn system: progressive difficulty, zombie spawning mechanics.
+  - UI/UX: inventory, health bar, ammo counter, game over screen.
+- **deliverable**: Playable survival game loop with zombies, weapons, and basic progression.
+- **acceptance**:
+  - Zombies spawn and chase players reliably; combat feels responsive.
+  - Health/damage system works correctly; death and respawn flow smoothly.
+  - Multiple weapons feel distinct; ammo management adds tactical depth.
 
 

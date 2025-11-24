@@ -56,34 +56,145 @@ export function createCapsuleCharacter(physics: Physics, position: { x: number; 
   const rbDesc = new RAPIER.RigidBodyDesc(RAPIER.RigidBodyType.Dynamic)
     .setTranslation(position.x, position.y, position.z)
     .setLinearDamping(0.1)
+    .setAngularDamping(0.9) // Prevent unwanted rotation
     .setCanSleep(false)
+    .lockRotations() // Lock all rotations for FPS controller
   const body = world.createRigidBody(rbDesc)
   const shape = RAPIER.ColliderDesc.capsule(height * 0.5, radius)
     .setFriction(0.9)
     .setRestitution(0.0)
   world.createCollider(shape, body)
 
+  // Physics parameters
   const maxSpeed = 9.0
   const accel = 40.0
-  const jumpImpulse = 4.5
+  const airAccel = 8.0 // Reduced acceleration in air
+  const jumpImpulse = 4.5 // Reduced from 4.5 for more reasonable jump height
+  const groundCheckDistance = radius + 0.1 // Slightly more than radius
+  const maxSlopeAngle = Math.PI / 3 // 60 degrees max walkable slope
+  const groundFriction = 0.85 // Friction when on ground
+  const airFriction = 0.1 // Minimal friction in air
+
+  // Ground detection state
+  let groundNormal = { x: 0, y: 1, z: 0 }
+  let groundDistance = Infinity
+  let onGround = false
+  let slopeAngle = 0
+  
+  // Jump state tracking for edge detection
+  let wasJumpPressed = false
 
   const update = (dt: number, input: { desiredVX: number; desiredVZ: number; jump: boolean }) => {
     const linvel = body.linvel()
+    const position = body.translation()
 
-    // Ground check: simplistic — raycast down a small distance
-    const origin = body.translation()
-    const ray = new RAPIER.Ray(origin, { x: 0, y: -1, z: 0 })
-    const hit = world.castRay(ray, 0.6, true)
-    let onGround = false
-    if (hit) {
-      // castRay returns RayColliderHit | null; toi is time-of-impact
-      const anyHit = hit as unknown as { toi?: number }
-      onGround = typeof anyHit.toi === 'number' && anyHit.toi < 0.55
+    // Enhanced ground detection using multiple raycasts
+    // Cast from center and slightly offset positions for better detection
+    const rayOrigins = [
+      position,
+      { x: position.x + radius * 0.7, y: position.y, z: position.z },
+      { x: position.x - radius * 0.7, y: position.y, z: position.z },
+      { x: position.x, y: position.y, z: position.z + radius * 0.7 },
+      { x: position.x, y: position.y, z: position.z - radius * 0.7 },
+    ]
+
+    let closestHit: { toi: number; normal: { x: number; y: number; z: number } } | null = null
+    let minDistance = Infinity
+
+    for (const origin of rayOrigins) {
+      const ray = new RAPIER.Ray(origin, { x: 0, y: -1, z: 0 })
+      const hit = world.castRay(ray, groundCheckDistance + 0.2, true)
+      
+      if (hit) {
+        const anyHit = hit as unknown as { toi?: number; normal?: { x: number; y: number; z: number } }
+        const toi = typeof anyHit.toi === 'number' ? anyHit.toi : (hit as any).timeOfImpact
+        if (typeof toi === 'number' && toi < minDistance) {
+          minDistance = toi
+          // Use normal from hit if available, otherwise default to up
+          const normal = anyHit.normal || { x: 0, y: 1, z: 0 }
+          closestHit = { toi, normal }
+        }
+      }
     }
 
-    // Desired world-space horizontal velocity
+    // Determine ground state
+    onGround = false
+    groundDistance = Infinity
+    groundNormal = { x: 0, y: 1, z: 0 }
+    slopeAngle = 0
+
+    if (closestHit && minDistance < groundCheckDistance) {
+      groundDistance = minDistance
+      groundNormal = closestHit.normal
+      
+      // Calculate slope angle (angle between ground normal and up vector)
+      const upDot = groundNormal.y
+      slopeAngle = Math.acos(Math.max(-1, Math.min(1, upDot)))
+      
+      // Check vertical velocity - must be low to be considered on ground
+      const verticalVelocity = linvel.y
+      const maxVerticalVelocityForGround = 0.5 // Allow small upward velocity for edge cases
+      
+      // Consider on ground if:
+      // 1. Slope is walkable
+      // 2. Close enough to ground
+      // 3. Not moving upward too fast (not already jumping)
+      // 4. Ground is actually beneath the player (normal points mostly up)
+      onGround = slopeAngle < maxSlopeAngle && 
+                 minDistance < groundCheckDistance &&
+                 verticalVelocity <= maxVerticalVelocityForGround &&
+                 upDot > 0.5 // Ground normal should point mostly upward
+    }
+
+    // Apply friction based on ground state
+    const currentFriction = onGround ? groundFriction : airFriction
+    const horizontalVel = { x: linvel.x, y: 0, z: linvel.z }
+    const horizontalSpeed = Math.sqrt(horizontalVel.x * horizontalVel.x + horizontalVel.z * horizontalVel.z)
+    
+    if (horizontalSpeed > 0.01 && onGround) {
+      const frictionForce = horizontalSpeed * currentFriction
+      const frictionDir = {
+        x: -horizontalVel.x / horizontalSpeed,
+        y: 0,
+        z: -horizontalVel.z / horizontalSpeed
+      }
+      body.applyImpulse({
+        x: frictionDir.x * frictionForce * body.mass() * dt,
+        y: 0,
+        z: frictionDir.z * frictionForce * body.mass() * dt
+      }, true)
+    }
+
+    // Project desired movement onto ground plane if on slope
     let desiredVX = input.desiredVX
     let desiredVZ = input.desiredVZ
+    
+    if (onGround && slopeAngle > 0.01) {
+      // Project movement direction onto the ground plane
+      const desiredDir = { x: desiredVX, y: 0, z: desiredVZ }
+      const desiredLen = Math.sqrt(desiredDir.x * desiredDir.x + desiredDir.z * desiredDir.z)
+      if (desiredLen > 0.001) {
+        // Normalize
+        desiredDir.x /= desiredLen
+        desiredDir.z /= desiredLen
+        
+        // Project onto ground plane (remove component along ground normal)
+        const dot = desiredDir.x * groundNormal.x + desiredDir.z * groundNormal.z
+        desiredDir.x -= groundNormal.x * dot
+        desiredDir.z -= groundNormal.z * dot
+        
+        // Renormalize and scale
+        const projLen = Math.sqrt(desiredDir.x * desiredDir.x + desiredDir.z * desiredDir.z)
+        if (projLen > 0.001) {
+          desiredDir.x /= projLen
+          desiredDir.z /= projLen
+          desiredVX = desiredDir.x * desiredLen
+          desiredVZ = desiredDir.z * desiredLen
+        }
+      }
+    }
+
+    // Clamp desired speed
     const desiredSpeedSq = desiredVX * desiredVX + desiredVZ * desiredVZ
     if (desiredSpeedSq > maxSpeed * maxSpeed) {
       const invLen = 1 / Math.sqrt(desiredSpeedSq)
@@ -91,16 +202,25 @@ export function createCapsuleCharacter(physics: Physics, position: { x: number; 
       desiredVZ *= invLen * maxSpeed
     }
 
-    // Accelerate toward desired horizontal velocity; preserve Y
+    // Apply acceleration (different in air vs on ground)
+    const currentAccel = onGround ? accel : airAccel
     const dvx = desiredVX - linvel.x
     const dvz = desiredVZ - linvel.z
-    const ax = Math.max(-accel, Math.min(accel, dvx / Math.max(dt, 0.0001)))
-    const az = Math.max(-accel, Math.min(accel, dvz / Math.max(dt, 0.0001)))
-    body.applyImpulse({ x: ax * body.mass() * dt, y: 0, z: az * body.mass() * dt }, true)
+    const accelX = Math.max(-currentAccel, Math.min(currentAccel, dvx / Math.max(dt, 0.0001)))
+    const accelZ = Math.max(-currentAccel, Math.min(currentAccel, dvz / Math.max(dt, 0.0001)))
+    
+    body.applyImpulse({
+      x: accelX * body.mass() * dt,
+      y: 0,
+      z: accelZ * body.mass() * dt
+    }, true)
 
-    if (input.jump && onGround) {
+    // Jump handling - only trigger on edge (press, not hold)
+    const jumpPressed = input.jump && !wasJumpPressed
+    if (jumpPressed && onGround) {
       body.applyImpulse({ x: 0, y: jumpImpulse * body.mass(), z: 0 }, true)
     }
+    wasJumpPressed = input.jump
   }
 
   return { body, update }
