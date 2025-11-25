@@ -134,6 +134,89 @@ export function createStatsOverlay(container: HTMLElement): StatsOverlay {
   }
 }
 
+export type Crosshair = {
+  flash: () => void
+}
+
+export function createCrosshair(container: HTMLElement): Crosshair {
+  const el = document.createElement('div')
+  el.style.position = 'absolute'
+  el.style.left = '50%'
+  el.style.top = '50%'
+  el.style.transform = 'translate(-50%, -50%)'
+  el.style.width = '20px'
+  el.style.height = '20px'
+  el.style.pointerEvents = 'none'
+  el.style.zIndex = '1000'
+  
+  // Create crosshair lines
+  const lineSize = 8
+  const lineThickness = 2
+  const gap = 2
+  
+  // Horizontal line (top)
+  const topLine = document.createElement('div')
+  topLine.style.position = 'absolute'
+  topLine.style.left = '50%'
+  topLine.style.top = `${gap}px`
+  topLine.style.transform = 'translateX(-50%)'
+  topLine.style.width = `${lineSize}px`
+  topLine.style.height = `${lineThickness}px`
+  topLine.style.background = 'rgba(255, 255, 255, 0.8)'
+  el.appendChild(topLine)
+  
+  // Horizontal line (bottom)
+  const bottomLine = document.createElement('div')
+  bottomLine.style.position = 'absolute'
+  bottomLine.style.left = '50%'
+  bottomLine.style.bottom = `${gap}px`
+  bottomLine.style.transform = 'translateX(-50%)'
+  bottomLine.style.width = `${lineSize}px`
+  bottomLine.style.height = `${lineThickness}px`
+  bottomLine.style.background = 'rgba(255, 255, 255, 0.8)'
+  el.appendChild(bottomLine)
+  
+  // Vertical line (left)
+  const leftLine = document.createElement('div')
+  leftLine.style.position = 'absolute'
+  leftLine.style.left = `${gap}px`
+  leftLine.style.top = '50%'
+  leftLine.style.transform = 'translateY(-50%)'
+  leftLine.style.width = `${lineThickness}px`
+  leftLine.style.height = `${lineSize}px`
+  leftLine.style.background = 'rgba(255, 255, 255, 0.8)'
+  el.appendChild(leftLine)
+  
+  // Vertical line (right)
+  const rightLine = document.createElement('div')
+  rightLine.style.position = 'absolute'
+  rightLine.style.right = `${gap}px`
+  rightLine.style.top = '50%'
+  rightLine.style.transform = 'translateY(-50%)'
+  rightLine.style.width = `${lineThickness}px`
+  rightLine.style.height = `${lineSize}px`
+  rightLine.style.background = 'rgba(255, 255, 255, 0.8)'
+  el.appendChild(rightLine)
+  
+  container.appendChild(el)
+
+  return {
+    flash() {
+      // Flash by changing opacity and adding a white glow
+      el.style.transition = 'none'
+      el.style.opacity = '1'
+      el.style.filter = 'brightness(3) drop-shadow(0 0 4px rgba(255, 255, 255, 0.8))'
+      
+      // Reset after a brief moment
+      setTimeout(() => {
+        el.style.transition = 'opacity 0.2s ease-out, filter 0.2s ease-out'
+        el.style.opacity = '1'
+        el.style.filter = 'brightness(1) drop-shadow(none)'
+      }, 100)
+    },
+  }
+}
+
 function createCheckerTexture(size: number, squares: number, colorA: string, colorB: string): CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = size

@@ -1,7 +1,7 @@
 import './style.css'
-import { Scene, Mesh, BoxGeometry, MeshStandardMaterial, Line, BufferGeometry, LineBasicMaterial, Vector3, Quaternion } from 'three'
+import { Scene, Mesh, BoxGeometry, MeshStandardMaterial, Line, BufferGeometry, LineBasicMaterial, Vector3, Quaternion, Raycaster } from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
-import { createRenderer, createCamera, createLights, createGround, createWalls, createStatsOverlay, applySkybox } from './view'
+import { createRenderer, createCamera, createLights, createGround, createWalls, createStatsOverlay, createCrosshair, applySkybox } from './view'
 import { createInput } from './systems/input'
 import { createPhysicsWorld } from './systems/physics'
 import { createPlayer } from './systems/player'
@@ -270,27 +270,31 @@ export async function bootstrap(): Promise<void> {
       createTracerLine(result.origin, result.hitPoint, dir)
       
       if (result.hitPoint) {
-        // Find which block was hit by checking distance to block centers
-        let hitBlock: BlockData | null = null
-        let closestDist = Infinity
+        // Use raycaster to find which block was actually hit
+        const raycaster = new Raycaster()
+        raycaster.set(result.origin, dir.normalize())
         
-        for (const blockData of blocks.values()) {
-          if (blockData.destroyed) continue
+        // Get all non-destroyed block meshes
+        const blockMeshes = Array.from(blocks.values())
+          .filter(b => !b.destroyed)
+          .map(b => b.mesh)
+        
+        // Find intersections
+        const intersections = raycaster.intersectObjects(blockMeshes, false)
+        
+        if (intersections.length > 0) {
+          // Get the closest intersection (first one is closest)
+          const hitMesh = intersections[0].object as Mesh
           
-          const blockPos = blockData.mesh.position
-          const dist = result.hitPoint!.distanceTo(blockPos)
-          
-          // Check if hit point is within block bounds (0.6 is roughly half diagonal of 1x1x1 cube)
-          if (dist < 0.6 && dist < closestDist) {
-            closestDist = dist
-            hitBlock = blockData
+          // Find the block data for this mesh
+          for (const blockData of blocks.values()) {
+            if (blockData.mesh === hitMesh) {
+              // Send hit to server
+              net.sendHitBlock(blockData.id)
+              blockData.lastHitTime = performance.now() / 1000 // Record hit time in seconds
+              break
+            }
           }
-        }
-        
-        if (hitBlock) {
-          // Send hit to server
-          net.sendHitBlock(hitBlock.id)
-          hitBlock.lastHitTime = performance.now() / 1000 // Record hit time in seconds
         }
       }
     }
@@ -358,7 +362,16 @@ export async function bootstrap(): Promise<void> {
       throw new Error('Missing #app root element')
     }
     const stats = createStatsOverlay(appRoot)
-    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire: handleWeaponFire, net })
+    const crosshair = createCrosshair(appRoot)
+    
+    // Update handleWeaponFire to flash crosshair
+    const originalHandleWeaponFire = handleWeaponFire
+    const handleWeaponFireWithFlash = () => {
+      crosshair.flash()
+      originalHandleWeaponFire()
+    }
+    
+    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire: handleWeaponFireWithFlash, net })
     loop.start()
   })
   }
