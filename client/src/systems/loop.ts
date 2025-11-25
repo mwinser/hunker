@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, WebGLRenderer } from 'three'
+import { PerspectiveCamera, Scene, WebGLRenderer, Euler } from 'three'
 import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { Physics } from './physics'
 import type { Player } from './player'
@@ -73,7 +73,9 @@ export function createLoop(args: {
       lastFireState = input.state.fire
       // network send (lower rate, but piggyback here)
       const pos = player.mesh.position
-      const yaw = player.mesh.quaternion.clone().setFromRotationMatrix(player.mesh.matrixWorld).y || 0
+      // Extract yaw (rotation around Y axis) from quaternion using Euler angles
+      const euler = new Euler().setFromQuaternion(player.mesh.quaternion)
+      const yaw = euler.y
       net.sendState({ x: pos.x, y: pos.y, z: pos.z, yaw })
       // remotes integrate
       const snap = net.getLatestSnapshot()
