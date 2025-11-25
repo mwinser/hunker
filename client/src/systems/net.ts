@@ -1,5 +1,14 @@
+export type Block = {
+  id: string
+  x: number
+  y: number
+  z: number
+  health: number
+}
+
 export type Snapshot = {
   players: Record<string, { x: number; y: number; z: number; yaw: number; username: string }>
+  blocks: Block[]
 }
 
 export type Net = {
@@ -8,13 +17,16 @@ export type Net = {
   rttMs: number | null
   connect: (url?: string, username?: string) => void
   sendState: (s: { x: number; y: number; z: number; yaw: number }) => void
+  sendHitBlock: (blockId: string) => void
   getLatestSnapshot: () => Snapshot | null
+  getInitialBlocks: () => Block[] | null
 }
 
 export function createNet(): Net {
   let ws: WebSocket | null = null
   let id: string | null = null
   let latestSnapshot: Snapshot | null = null
+  let initialBlocks: Block[] | null = null
   let peers = 0
   let rttMs: number | null = null
   let lastPingSentAt = 0
@@ -44,8 +56,14 @@ export function createNet(): Net {
         if (msg.t === 'welcome') {
           id = msg.id as string
           rttMs = performance.now() - lastPingSentAt
+          if (msg.blocks) {
+            initialBlocks = msg.blocks as Block[]
+          }
         } else if (msg.t === 'snapshot') {
-          latestSnapshot = { players: msg.players as Snapshot['players'] }
+          latestSnapshot = { 
+            players: msg.players as Snapshot['players'],
+            blocks: msg.blocks as Block[]
+          }
           peers = Object.keys(latestSnapshot.players).length
         }
       } catch {}
@@ -67,6 +85,11 @@ export function createNet(): Net {
     ws.send(JSON.stringify({ t: 'state', ...s }))
   }
 
+  const sendHitBlock = (blockId: string) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ t: 'hitBlock', blockId }))
+  }
+
   return {
     get id() {
       return id
@@ -79,7 +102,9 @@ export function createNet(): Net {
     },
     connect,
     sendState,
+    sendHitBlock,
     getLatestSnapshot: () => latestSnapshot,
+    getInitialBlocks: () => initialBlocks,
   }
 }
 

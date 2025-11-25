@@ -9,17 +9,59 @@ type Client = {
   username: string
 }
 
+type Block = {
+  id: string
+  x: number
+  y: number
+  z: number
+  health: number
+}
+
 type ServerMsg =
-  | { t: 'welcome'; id: string }
-  | { t: 'snapshot'; players: Record<string, { x: number; y: number; z: number; yaw: number; username: string }> }
+  | { t: 'welcome'; id: string; blocks: Block[] }
+  | { t: 'snapshot'; players: Record<string, { x: number; y: number; z: number; yaw: number; username: string }>; blocks: Block[] }
 
 type ClientMsg =
   | { t: 'hello'; username?: string }
   | { t: 'state'; x: number; y: number; z: number; yaw: number }
+  | { t: 'hitBlock'; blockId: string }
 
 const PORT = Number(process.env.PORT ?? 8787)
 const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT })
 const clients = new Map<string, Client>()
+
+// Create blocks on server (source of truth)
+function createBlocks(count: number): Block[] {
+  const blocks: Block[] = []
+  const positionStackCount = new Map<string, number>()
+  const blockSize = 1
+  const groundSize = 40
+  const playArea = groundSize * 0.8
+  const halfPlayArea = playArea * 0.5
+
+  for (let i = 0; i < count; i++) {
+    const x = Math.floor((Math.random() * playArea - halfPlayArea) / blockSize) * blockSize
+    const z = Math.floor((Math.random() * playArea - halfPlayArea) / blockSize) * blockSize
+    
+    const posKey = `${x},${z}`
+    const stackHeight = positionStackCount.get(posKey) || 0
+    positionStackCount.set(posKey, stackHeight + 1)
+    
+    const y = 0.5 + stackHeight * blockSize
+    
+    blocks.push({
+      id: `block_${i}`,
+      x,
+      y,
+      z,
+      health: 100,
+    })
+  }
+
+  return blocks
+}
+
+const blocks = createBlocks(20)
 
 // Get local IP addresses
 function getLocalIPs(): string[] {
@@ -51,14 +93,14 @@ function snapshot() {
     const state = (c as any).state ?? { x: 0, y: 0, z: 0, yaw: 0 }
     ;(players as any)[id] = { ...state, username: c.username }
   }
-  broadcast({ t: 'snapshot', players })
+  broadcast({ t: 'snapshot', players, blocks })
 }
 
 wss.on('connection', (ws) => {
   const id = Math.random().toString(36).slice(2)
   const client: Client = { ws, id, username: 'Player' }
   clients.set(id, client)
-  ws.send(JSON.stringify({ t: 'welcome', id } satisfies ServerMsg))
+  ws.send(JSON.stringify({ t: 'welcome', id, blocks } satisfies ServerMsg))
 
   ws.on('message', (data) => {
     try {
@@ -67,6 +109,14 @@ wss.on('connection', (ws) => {
         client.username = msg.username
       } else if (msg.t === 'state') {
         ;(client as any).state = { x: msg.x, y: msg.y, z: msg.z, yaw: msg.yaw }
+      } else if (msg.t === 'hitBlock') {
+        const block = blocks.find(b => b.id === msg.blockId)
+        if (block && block.health > 0) {
+          block.health -= 25
+          if (block.health <= 0) {
+            block.health = 0
+          }
+        }
       }
     } catch {}
   })

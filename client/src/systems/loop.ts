@@ -4,8 +4,8 @@ import type { Physics } from './physics'
 import type { Player } from './player'
 import type { Input } from './input'
 import type { StatsOverlay } from '../view'
-import { createNet } from './net'
-import { simulateRemotes, updateRemotes } from './remotes'
+import type { Net } from './net'
+import { simulateRemotes, updateRemotes, type RemotePlayer } from './remotes'
 
 export function createLoop(args: {
   renderer: WebGLRenderer
@@ -18,8 +18,9 @@ export function createLoop(args: {
   serverUrl: string
   username: string
   onFire?: () => void
+  net: Net
 }) {
-  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire } = args
+  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire, net } = args
 
   const stepHz = 60
   const fixedDt = 1 / stepHz
@@ -32,10 +33,8 @@ export function createLoop(args: {
   let running = false
   let lastFireState = false
 
-  // networking
-  const net = createNet()
-  net.connect(serverUrl, username)
-  const remotes = new Map<string, ReturnType<typeof import('./remotes').createRemoteNode>>() as any
+  // networking - use provided net instance
+  const remotes = new Map<string, RemotePlayer>()
 
   // CSS2D renderer for username labels
   const labelRenderer = new CSS2DRenderer()
@@ -86,9 +85,9 @@ export function createLoop(args: {
             remotePlayers[id] = player
           }
         }
-        updateRemotes(remotes as any, remotePlayers, scene)
+        updateRemotes(remotes, remotePlayers, scene)
       }
-      simulateRemotes(remotes as any, fixedDt)
+      simulateRemotes(remotes, fixedDt)
       accumulator -= fixedDt
     }
 
