@@ -5,6 +5,9 @@ export type Physics = {
   ready: Promise<void>
   step: (dt: number) => void
   createStaticGround: (size: { x: number; y: number; z: number }) => Collider
+  createStaticCube: (position: { x: number; y: number; z: number }, size: { x: number; y: number; z: number }) => { collider: Collider; rigidBody: RigidBody }
+  createStaticWall: (position: { x: number; y: number; z: number }, size: { x: number; y: number; z: number }) => Collider
+  removeRigidBody: (rigidBody: RigidBody) => void
 }
 
 export function createPhysicsWorld(): Physics {
@@ -29,6 +32,39 @@ export function createPhysicsWorld(): Physics {
     return col
   }
 
+  const createStaticCube = (position: { x: number; y: number; z: number }, size: { x: number; y: number; z: number }) => {
+    if (!world) throw new Error('Physics not ready')
+    const rbDesc = RAPIER.RigidBodyDesc.fixed()
+      .setTranslation(position.x, position.y, position.z)
+    const rb = world.createRigidBody(rbDesc)
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(size.x * 0.5, size.y * 0.5, size.z * 0.5)
+        .setFriction(0.9)
+        .setRestitution(0.0),
+      rb
+    )
+    return { collider: col, rigidBody: rb }
+  }
+
+  const removeRigidBody = (rigidBody: RigidBody) => {
+    if (!world) throw new Error('Physics not ready')
+    world.removeRigidBody(rigidBody)
+  }
+
+  const createStaticWall = (position: { x: number; y: number; z: number }, size: { x: number; y: number; z: number }) => {
+    if (!world) throw new Error('Physics not ready')
+    const rbDesc = RAPIER.RigidBodyDesc.fixed()
+      .setTranslation(position.x, position.y, position.z)
+    const rb = world.createRigidBody(rbDesc)
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(size.x * 0.5, size.y * 0.5, size.z * 0.5)
+        .setFriction(0.9)
+        .setRestitution(0.0),
+      rb
+    )
+    return col
+  }
+
   return {
     get world() {
       if (!world) throw new Error('Physics not ready')
@@ -37,6 +73,9 @@ export function createPhysicsWorld(): Physics {
     ready,
     step,
     createStaticGround,
+    createStaticCube,
+    createStaticWall,
+    removeRigidBody,
   }
 }
 

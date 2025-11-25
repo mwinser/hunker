@@ -17,8 +17,9 @@ export function createLoop(args: {
   stats: StatsOverlay
   serverUrl: string
   username: string
+  onFire?: () => void
 }) {
-  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username } = args
+  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire } = args
 
   const stepHz = 60
   const fixedDt = 1 / stepHz
@@ -29,6 +30,7 @@ export function createLoop(args: {
   let fps = 0
 
   let running = false
+  let lastFireState = false
 
   // networking
   const net = createNet()
@@ -65,6 +67,11 @@ export function createLoop(args: {
     while (accumulator >= fixedDt) {
       player.update(fixedDt)
       physics.step(fixedDt)
+      // Handle weapon firing (only on edge trigger)
+      if (input.state.fire && !lastFireState && onFire) {
+        onFire()
+      }
+      lastFireState = input.state.fire
       // network send (lower rate, but piggyback here)
       const pos = player.mesh.position
       const yaw = player.mesh.quaternion.clone().setFromRotationMatrix(player.mesh.matrixWorld).y || 0

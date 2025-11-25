@@ -1,4 +1,4 @@
-import { Camera, Raycaster, Vector3 } from 'three'
+import { Camera, Raycaster, Vector3, Quaternion } from 'three'
 
 export type Hitscan = {
   fire: () => { origin: Vector3; hitPoint: Vector3 | null }
@@ -13,7 +13,9 @@ export function createHitscan(camera: Camera, targets: { getHitPoint: (rayOrigin
     fire() {
       origin.copy((camera as any).getWorldPosition(new Vector3()))
       const forward = new Vector3(0, 0, -1)
-      dir.copy(forward.applyQuaternion((camera as any).quaternion))
+      const worldQuat = new Quaternion()
+      ;(camera as any).getWorldQuaternion(worldQuat)
+      dir.copy(forward.applyQuaternion(worldQuat))
       raycaster.set(origin, dir)
       let best: Vector3 | null = null
       let bestDist = Infinity

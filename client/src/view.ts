@@ -11,6 +11,7 @@ import {
   CanvasTexture,
   RepeatWrapping,
   CubeTexture,
+  BoxGeometry,
 } from 'three'
 
 export function createRenderer(container: HTMLElement): WebGLRenderer {
@@ -43,7 +44,7 @@ export function createLights(): (AmbientLight | DirectionalLight)[] {
 
 export function createGround(): Group {
   const group = new Group()
-  const tex = createCheckerTexture(256, 8, '#5b5f66', '#3a3d42')
+  const tex = createCheckerTexture(256, 4, '#5b5f66', '#3a3d42')
   tex.wrapS = RepeatWrapping
   tex.wrapT = RepeatWrapping
   tex.repeat.set(20, 20)
@@ -55,6 +56,53 @@ export function createGround(): Group {
   plane.rotateX(-Math.PI / 2)
   plane.receiveShadow = false
   group.add(plane)
+  return group
+}
+
+export function createWalls(): Group {
+  const group = new Group()
+  const wallMaterial = new MeshStandardMaterial({
+    color: 0x88ccff,
+    transparent: true,
+    opacity: 0.3,
+  })
+
+  const groundSize = 40
+  const wallHeight = 10
+  const wallThickness = 0.2
+
+  // North wall (positive Z)
+  const northWall = new Mesh(
+    new BoxGeometry(groundSize, wallHeight, wallThickness),
+    wallMaterial
+  )
+  northWall.position.set(0, wallHeight * 0.5, groundSize * 0.5)
+  group.add(northWall)
+
+  // South wall (negative Z)
+  const southWall = new Mesh(
+    new BoxGeometry(groundSize, wallHeight, wallThickness),
+    wallMaterial
+  )
+  southWall.position.set(0, wallHeight * 0.5, -groundSize * 0.5)
+  group.add(southWall)
+
+  // East wall (positive X)
+  const eastWall = new Mesh(
+    new BoxGeometry(wallThickness, wallHeight, groundSize),
+    wallMaterial
+  )
+  eastWall.position.set(groundSize * 0.5, wallHeight * 0.5, 0)
+  group.add(eastWall)
+
+  // West wall (negative X)
+  const westWall = new Mesh(
+    new BoxGeometry(wallThickness, wallHeight, groundSize),
+    wallMaterial
+  )
+  westWall.position.set(-groundSize * 0.5, wallHeight * 0.5, 0)
+  group.add(westWall)
+
   return group
 }
 

@@ -28,6 +28,84 @@
   - Clean connect/disconnect flows; no desync after 5+ minutes of movement.
   - Clients on the same WiFi network can successfully discover or manually connect to the game server.
 
+### Architecture Evaluation — OOP vs Functional Programming
+
+#### Current State Analysis
+The codebase currently uses a **functional programming approach** with factory functions:
+- Factory functions return objects with methods: `createPhysicsWorld()`, `createPlayer()`, `createInput()`, `createLoop()`, `createNet()`
+- State is encapsulated in closures within factory functions
+- No classes are used (except external libraries: Three.js, Rapier)
+- Type safety via TypeScript interfaces for returned objects
+
+#### Strengths of Current Approach
+- ✅ **Simple and straightforward**: Easy to understand, minimal boilerplate
+- ✅ **Good encapsulation**: Closures provide natural private state
+- ✅ **Testable**: Dependencies can be easily mocked/injected
+- ✅ **No inheritance complexity**: Avoids deep class hierarchies
+- ✅ **Functional composition**: Natural for systems that transform data
+- ✅ **Works well for Phase 1-2**: Sufficient for current scope
+
+#### Potential Issues as Codebase Grows
+- ⚠️ **Scalability concerns**: Many factory functions may become unwieldy with 50+ entities
+- ⚠️ **Hidden state mutations**: Closures make debugging state changes harder
+- ⚠️ **No entity hierarchy**: Similar entities (zombies, players, NPCs) will duplicate logic
+- ⚠️ **Serialization challenges**: Closure-based state is harder to serialize for networking/debugging
+- ⚠️ **Limited polymorphism**: Difficult to have variants (e.g., different zombie types, weapon types)
+
+#### Recommended Architectural Changes
+
+**1. Hybrid Approach (Recommended)**
+- **Keep functional factories** for simple, stateless systems:
+  - `createInput()`, `createNet()`, `createRenderer()` — these work well as-is
+- **Consider classes or ECS** for game entities:
+  - Players, zombies, weapons, projectiles — these benefit from shared behavior and state management
+
+**2. Entity Component System (ECS) for Phase 3**
+- **Why**: ECS is industry-standard for game development, especially with many entities
+- **Structure**:
+  - **Entities**: Simple IDs (zombie_1, player_2, bullet_42)
+  - **Components**: Data only (Position, Health, Weapon, AIState)
+  - **Systems**: Logic that operates on components (MovementSystem, CombatSystem, AISystem)
+- **Benefits**:
+  - Easy to add new entity types (just combine components)
+  - Efficient queries (find all entities with Health + Position)
+  - Natural fit for networking (components serialize easily)
+  - Better performance for many entities
+- **Migration path**: Start with new entities (zombies) in ECS, keep existing player system functional
+
+**3. Explicit State Objects**
+- Replace closure-hidden state with explicit state objects:
+  ```typescript
+  // Instead of closure state
+  type PlayerState = {
+    position: Vector3
+    health: number
+    weapon: WeaponState
+  }
+  ```
+- Benefits: Easier debugging, serialization, time-travel debugging
+
+**4. Composition Pattern for Variants**
+- Use composition over inheritance for entity variants:
+  - `createZombie({ type: 'walker', speed: 2.0 })`
+  - `createZombie({ type: 'runner', speed: 5.0 })`
+  - Components define behavior, not classes
+
+#### Implementation Strategy
+- **Phase 2 (Current)**: Keep functional approach — it's working well
+- **Phase 3 (Zombies/Weapons)**: 
+  - Option A: Introduce ECS for new entities, keep player functional
+  - Option B: Migrate player to ECS, use ECS for all entities
+  - Option C: Use classes for entities, keep systems functional
+- **Decision point**: Evaluate when implementing first zombie — if simple factory works, keep it; if complexity grows, migrate to ECS
+
+#### Specific Recommendations
+1. **Keep as-is**: Input, Networking, Rendering, Physics wrapper
+2. **Consider classes**: Player, Zombie (if variants needed), Weapon (if multiple types)
+3. **Consider ECS**: If >10 entity types or need efficient queries
+4. **Explicit state**: Migrate closure state to explicit state objects for debugging
+5. **No premature optimization**: Current approach is fine until it becomes a problem
+
 ### Phase 3 — Gameplay systems and content
 - **objective**: Add core gameplay mechanics, zombie AI, and survival elements.
 - **core tasks**:
