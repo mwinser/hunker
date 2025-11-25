@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { networkInterfaces } from 'os'
+import { createServer } from 'http'
 // @ts-ignore - bonjour is CommonJS
 import Bonjour from 'bonjour'
 
@@ -27,7 +28,30 @@ type ClientMsg =
   | { t: 'hitBlock'; blockId: string }
 
 const PORT = Number(process.env.PORT ?? 8787)
-const wss = new WebSocketServer({ host: '0.0.0.0', port: PORT })
+
+// Create HTTP server for discovery endpoint
+const httpServer = createServer((req, res) => {
+  // CORS headers for browser access
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET')
+  
+  if (req.method === 'GET' && req.url === '/discover') {
+    // Discovery endpoint - respond with server info
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      name: 'Hunker Game Server',
+      port: PORT,
+      players: clients.size,
+      status: 'running'
+    }))
+  } else {
+    res.writeHead(404)
+    res.end('Not found')
+  }
+})
+
+// Attach WebSocket server to HTTP server
+const wss = new WebSocketServer({ server: httpServer })
 const clients = new Map<string, Client>()
 
 // Create blocks on server (source of truth)
@@ -137,28 +161,34 @@ const service = bonjour.publish({
   protocol: 'tcp',
 })
 
-// Display server information
-const localIPs = getLocalIPs()
-console.log('\n=== Game Server Started ===')
-console.log(`Port: ${PORT}`)
-console.log('\nConnect from other devices on the same network using:')
-if (localIPs.length > 0) {
-  localIPs.forEach((ip) => {
-    console.log(`  ws://${ip}:${PORT}`)
-  })
-} else {
-  console.log('  (No network interfaces found)')
-}
-console.log('\nLocal connections:')
-console.log(`  ws://localhost:${PORT}`)
-console.log('\nmDNS/Bonjour: Server is discoverable as "Hunker Game Server"')
-console.log('========================\n')
+// Start HTTP server
+httpServer.listen(PORT, '0.0.0.0', () => {
+  // Display server information
+  const localIPs = getLocalIPs()
+  console.log('\n=== Game Server Started ===')
+  console.log(`Port: ${PORT}`)
+  console.log(`Discovery endpoint: http://<ip>:${PORT}/discover`)
+  console.log('\nConnect from other devices on the same network using:')
+  if (localIPs.length > 0) {
+    localIPs.forEach((ip) => {
+      console.log(`  ws://${ip}:${PORT}`)
+    })
+  } else {
+    console.log('  (No network interfaces found)')
+  }
+  console.log('\nLocal connections:')
+  console.log(`  ws://localhost:${PORT}`)
+  console.log('\nmDNS/Bonjour: Server is discoverable as "Hunker Game Server"')
+  console.log('========================\n')
+})
 
 // Cleanup on exit
 process.on('SIGINT', () => {
-  bonjour.unpublishAll(() => {
-    bonjour.destroy()
-    process.exit(0)
+  httpServer.close(() => {
+    bonjour.unpublishAll(() => {
+      bonjour.destroy()
+      process.exit(0)
+    })
   })
 })
 

@@ -107,6 +107,156 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
       `
       discoveryStatus.textContent = 'Searching for servers on local network...'
 
+      // Server discovery function - scan all 192.168.x.x IPs
+      const discoverServers = async (port: string): Promise<string | null> => {
+        const testPort = parseInt(port) || 8787
+        const timeout = 100 // ms per HTTP request (faster than WebSocket)
+
+        // Get local IP hints from WebRTC (if available)
+        const getLocalIPs = async (): Promise<string[]> => {
+          try {
+            const pc = new RTCPeerConnection({ iceServers: [] })
+            const candidates: string[] = []
+            
+            return new Promise<string[]>((resolve) => {
+              pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                  const candidate = event.candidate.candidate
+                  const match = candidate.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/)
+                  if (match && match[1].startsWith('192.168.')) {
+                    candidates.push(match[1])
+                  }
+                } else {
+                  // All candidates gathered
+                  resolve([...new Set(candidates)])
+                }
+              }
+              
+              pc.createDataChannel('')
+              pc.createOffer().then(offer => pc.setLocalDescription(offer))
+              
+              // Timeout after 1 second
+              setTimeout(() => {
+                resolve([...new Set(candidates)])
+              }, 1000)
+            })
+          } catch {
+            return []
+          }
+        }
+
+        // Test HTTP discovery endpoint (much faster than WebSocket)
+        const testConnection = async (ip: string): Promise<boolean> => {
+          try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), timeout)
+            
+            const response = await fetch(`http://${ip}:${testPort}/discover`, {
+              method: 'GET',
+              signal: controller.signal,
+              mode: 'cors'
+            })
+            
+            clearTimeout(timeoutId)
+            
+            if (response.ok) {
+              const data = await response.json()
+              return data.name === 'Hunker Game Server'
+            }
+            return false
+          } catch {
+            return false
+          }
+        }
+
+        // Try localhost first (fastest)
+        if (await testConnection('localhost')) {
+          return 'localhost'
+        }
+        if (await testConnection('127.0.0.1')) {
+          return '127.0.0.1'
+        }
+
+        // Get all 192.168.x.x IPs to check
+        const localIPs = await getLocalIPs()
+        const allIPs: string[] = []
+        const subnetsToScan = new Set<number>()
+
+        // If we found local IPs via WebRTC, use those and scan their subnets
+        if (localIPs.length > 0) {
+          // Extract subnets from detected IPs
+          for (const ip of localIPs) {
+            const parts = ip.split('.')
+            if (parts.length === 4 && parts[0] === '192' && parts[1] === '168') {
+              const subnet = parseInt(parts[2])
+              if (!isNaN(subnet)) {
+                subnetsToScan.add(subnet)
+              }
+            }
+          }
+        } else {
+          // No local IPs detected, scan a reasonable range of common subnets (0-15)
+          // This covers most home/office networks without being too slow
+          for (let subnet = 0; subnet <= 15; subnet++) {
+            subnetsToScan.add(subnet)
+          }
+        }
+
+        // For each subnet to scan, add all host IPs (1-254)
+        for (const subnet of subnetsToScan) {
+          for (let host = 1; host <= 254; host++) {
+            allIPs.push(`192.168.${subnet}.${host}`)
+          }
+        }
+
+        // Remove duplicates
+        const uniqueIPs = [...new Set(allIPs)]
+        const subnetList = Array.from(subnetsToScan).sort((a, b) => a - b).join(', ')
+        
+        // Update status to show detected IPs and subnets
+        if (localIPs.length > 0) {
+          discoveryStatus.textContent = `Detected IPs: ${localIPs.join(', ')}\nScanning subnets: 192.168.{${subnetList}}.x\nTotal: ${uniqueIPs.length} IPs on port ${testPort}...`
+        } else {
+          discoveryStatus.textContent = `No local IPs detected.\nScanning subnets: 192.168.{${subnetList}}.x\nTotal: ${uniqueIPs.length} IPs on port ${testPort}...`
+        }
+
+        // Test IPs in parallel batches (HTTP is lighter, so we can do more in parallel)
+        const batchSize = 50
+        let tested = 0
+        for (let i = 0; i < uniqueIPs.length; i += batchSize) {
+          const batch = uniqueIPs.slice(i, i + batchSize)
+          const results = await Promise.all(batch.map(ip => testConnection(ip)))
+          tested += batch.length
+          for (let j = 0; j < batch.length; j++) {
+            if (results[j]) {
+              // Found a server! Return immediately
+              return batch[j]
+            }
+          }
+          // Update status
+          const percent = Math.round((tested / uniqueIPs.length) * 100)
+          discoveryStatus.textContent = `Scanning ${uniqueIPs.length} IPs on port ${testPort}... (${tested}/${uniqueIPs.length}, ${percent}%)`
+        }
+
+        return null
+      }
+
+      // Start discovery
+      const startDiscovery = async () => {
+        const discoveredIP = await discoverServers(portInput.value)
+        if (discoveredIP) {
+          ipInput.value = discoveredIP
+          discoveryStatus.textContent = `✓ Found server at ${discoveredIP}`
+          discoveryStatus.style.color = '#4ade80'
+        } else {
+          discoveryStatus.textContent = 'No servers found. Enter server IP manually.'
+          discoveryStatus.style.color = '#aaa'
+        }
+      }
+
+      // Start discovery immediately
+      void startDiscovery()
+
       // Buttons
       const buttonContainer = document.createElement('div')
       buttonContainer.style.cssText = 'display: flex; gap: 1rem; margin-top: 1rem;'
