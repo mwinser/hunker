@@ -106,6 +106,7 @@ export function simulateRemotes(remotes: Map<string, RemotePlayer>, dt: number):
   const posLerp = Math.min(1, dt * 10)
   const rotLerp = Math.min(1, dt * 10)
   const tmpQuat = new Quaternion()
+  const targetQuat = new Quaternion()
   for (const r of remotes.values()) {
     r.node.position.set(
       lerp(r.node.position.x, r.targetPos.x, posLerp),
@@ -113,8 +114,12 @@ export function simulateRemotes(remotes: Map<string, RemotePlayer>, dt: number):
       lerp(r.node.position.z, r.targetPos.z, posLerp)
     )
     // Rotate to match yaw so front mark points in correct direction
-    tmpQuat.setFromAxisAngle(new Vector3(0, 1, 0), r.yaw)
-    r.node.quaternion.slerp(tmpQuat, rotLerp)
+    targetQuat.setFromAxisAngle(new Vector3(0, 1, 0), r.yaw)
+    // Ensure we take the shortest path by checking dot product
+    if (r.node.quaternion.dot(targetQuat) < 0) {
+      targetQuat.negate()
+    }
+    r.node.quaternion.slerp(targetQuat, rotLerp)
   }
 }
 
