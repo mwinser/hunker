@@ -134,6 +134,122 @@ export function createStatsOverlay(container: HTMLElement): StatsOverlay {
   }
 }
 
+export type HUD = {
+  el: HTMLDivElement
+  update: (args: { health: number; stamina: number }) => void
+}
+
+export function createHUD(container: HTMLElement): HUD {
+  const el = document.createElement('div')
+  el.style.position = 'absolute'
+  el.style.left = '12px'
+  el.style.bottom = '12px'
+  el.style.padding = '12px 16px'
+  el.style.background = 'rgba(0,0,0,0.5)'
+  el.style.borderRadius = '8px'
+  el.style.pointerEvents = 'none'
+  el.style.zIndex = '100'
+  el.style.minWidth = '200px'
+  el.style.fontFamily = 'system-ui, sans-serif'
+  el.style.color = '#fff'
+
+  // Health bar
+  const healthContainer = document.createElement('div')
+  healthContainer.style.marginBottom = '10px'
+  
+  const healthLabel = document.createElement('div')
+  healthLabel.textContent = 'Health'
+  healthLabel.style.fontSize = '12px'
+  healthLabel.style.marginBottom = '4px'
+  healthLabel.style.opacity = '0.9'
+  healthContainer.appendChild(healthLabel)
+
+  const healthBarBg = document.createElement('div')
+  healthBarBg.style.width = '100%'
+  healthBarBg.style.height = '20px'
+  healthBarBg.style.background = 'rgba(255,255,255,0.1)'
+  healthBarBg.style.borderRadius = '4px'
+  healthBarBg.style.overflow = 'hidden'
+  healthBarBg.style.position = 'relative'
+  
+  const healthBarFill = document.createElement('div')
+  healthBarFill.style.width = '100%'
+  healthBarFill.style.height = '100%'
+  healthBarFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)'
+  healthBarFill.style.transition = 'width 0.3s ease-out'
+  healthBarBg.appendChild(healthBarFill)
+
+  const healthText = document.createElement('div')
+  healthText.style.position = 'absolute'
+  healthText.style.top = '50%'
+  healthText.style.left = '50%'
+  healthText.style.transform = 'translate(-50%, -50%)'
+  healthText.style.fontSize = '11px'
+  healthText.style.fontWeight = '600'
+  healthText.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)'
+  healthText.textContent = '100/100'
+  healthBarBg.appendChild(healthText)
+
+  healthContainer.appendChild(healthBarBg)
+
+  // Stamina bar
+  const staminaContainer = document.createElement('div')
+  
+  const staminaLabel = document.createElement('div')
+  staminaLabel.textContent = 'Stamina'
+  staminaLabel.style.fontSize = '12px'
+  staminaLabel.style.marginBottom = '4px'
+  staminaLabel.style.opacity = '0.9'
+  staminaContainer.appendChild(staminaLabel)
+
+  const staminaBarBg = document.createElement('div')
+  staminaBarBg.style.width = '100%'
+  staminaBarBg.style.height = '20px'
+  staminaBarBg.style.background = 'rgba(255,255,255,0.1)'
+  staminaBarBg.style.borderRadius = '4px'
+  staminaBarBg.style.overflow = 'hidden'
+  staminaBarBg.style.position = 'relative'
+  
+  const staminaBarFill = document.createElement('div')
+  staminaBarFill.style.width = '100%'
+  staminaBarFill.style.height = '100%'
+  staminaBarFill.style.background = 'linear-gradient(90deg, #3b82f6, #2563eb)'
+  staminaBarFill.style.transition = 'width 0.3s ease-out'
+  staminaBarBg.appendChild(staminaBarFill)
+
+  const staminaText = document.createElement('div')
+  staminaText.style.position = 'absolute'
+  staminaText.style.top = '50%'
+  staminaText.style.left = '50%'
+  staminaText.style.transform = 'translate(-50%, -50%)'
+  staminaText.style.fontSize = '11px'
+  staminaText.style.fontWeight = '600'
+  staminaText.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)'
+  staminaText.textContent = '100/100'
+  staminaBarBg.appendChild(staminaText)
+
+  staminaContainer.appendChild(staminaBarBg)
+
+  el.appendChild(healthContainer)
+  el.appendChild(staminaContainer)
+  container.appendChild(el)
+
+  return {
+    el,
+    update({ health, stamina }) {
+      const maxValue = 100
+      const healthPercent = Math.max(0, Math.min(100, (health / maxValue) * 100))
+      const staminaPercent = Math.max(0, Math.min(100, (stamina / maxValue) * 100))
+      
+      healthBarFill.style.width = `${healthPercent}%`
+      healthText.textContent = `${Math.round(health)}/${maxValue}`
+      
+      staminaBarFill.style.width = `${staminaPercent}%`
+      staminaText.textContent = `${Math.round(stamina)}/${maxValue}`
+    },
+  }
+}
+
 export type Crosshair = {
   flash: () => void
 }

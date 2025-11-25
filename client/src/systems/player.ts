@@ -7,6 +7,7 @@ import type { Input } from './input'
 export type Player = {
   mesh: Group
   update: (dt: number) => void
+  getStamina: () => number
 }
 
 export function createPlayer(args: { scene: import('three').Scene; camera: PerspectiveCamera; physics: Physics; input: Input; username: string }): Player {
@@ -29,6 +30,11 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
   const worldRight = new Vector3()
   const tmpQuat = new Quaternion()
 
+  // Stamina state
+  const maxStamina = 100
+  let stamina = maxStamina
+  let lastJumpState = false
+
   const update = (dt: number) => {
     if (!character) return
 
@@ -50,15 +56,40 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
     worldRight.copy(worldForward).cross(new Vector3(0, 1, 0)).normalize()
     const forwardAxis = (s.moveForward ? 1 : 0) + (s.moveBackward ? -1 : 0)
     const rightAxis = (s.moveRight ? 1 : 0) + (s.moveLeft ? -1 : 0)
-    const speed = s.sprint ? 9.0 : 6.0
+    const isMoving = forwardAxis !== 0 || rightAxis !== 0
+    const canSprint = stamina > 0
+    const isSprinting = s.sprint && canSprint
+    const speed = isSprinting ? 9.0 : 6.0
     const move = worldForward.multiplyScalar(forwardAxis).add(worldRight.multiplyScalar(rightAxis))
     if (move.lengthSq() > 1e-6) move.normalize()
     const desired = move.multiplyScalar(speed)
 
+    // Stamina management
+    if (isMoving) {
+      if (isSprinting) {
+        stamina -= 3 * dt // Sprint costs 3 stamina/sec
+      } else {
+        stamina -= 1 * dt // Normal movement costs 1 stamina/sec
+      }
+    } else {
+      stamina += 3 * dt // Rest gains 3 stamina/sec
+    }
+    
+    // Jump cost (edge detection - only charge on jump initiation)
+    const jumpInitiated = s.jump && !lastJumpState
+    const isOnGround = character.isOnGround()
+    const canJump = isOnGround && (!jumpInitiated || stamina >= 5)
+    if (jumpInitiated && canJump) {
+      stamina -= 5 // Jump costs 5 stamina
+    }
+    lastJumpState = s.jump
+    
+    stamina = Math.max(0, Math.min(maxStamina, stamina))
+
     character.update(dt, {
       desiredVX: desired.x,
       desiredVZ: desired.z,
-      jump: s.jump,
+      jump: s.jump && canJump,
     })
 
     // Camera offset (head) — local to playerRoot
@@ -125,7 +156,11 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
   label.position.set(0, 1.8, 0) // Position above the avatar
   playerRoot.add(label)
 
-  return { mesh: playerRoot, update }
+  return { 
+    mesh: playerRoot, 
+    update,
+    getStamina: () => stamina
+  }
 }
 
 

@@ -3,7 +3,7 @@ import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { Physics } from './physics'
 import type { Player } from './player'
 import type { Input } from './input'
-import type { StatsOverlay } from '../view'
+import type { StatsOverlay, HUD } from '../view'
 import type { Net } from './net'
 import { simulateRemotes, updateRemotes, type RemotePlayer } from './remotes'
 
@@ -15,12 +15,13 @@ export function createLoop(args: {
   player: Player
   input: Input
   stats: StatsOverlay
+  hud: HUD
   serverUrl: string
   username: string
   onFire?: () => void
   net: Net
 }) {
-  const { renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire, net } = args
+  const { renderer, scene, camera, physics, player, input, stats, hud, serverUrl, username, onFire, net } = args
 
   const stepHz = 60
   const fixedDt = 1 / stepHz
@@ -107,6 +108,8 @@ export function createLoop(args: {
       const p = (player.mesh.position)
       stats.update({ fps, position: `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}` })
     }
+    // Update HUD with current stamina (update every frame for smooth updates)
+    hud.update({ health: 100, stamina: player.getStamina() })
 
     requestAnimationFrame(frame)
   }

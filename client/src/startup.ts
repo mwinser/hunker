@@ -1,7 +1,7 @@
 import './style.css'
 import { Scene, Mesh, BoxGeometry, MeshStandardMaterial, Line, BufferGeometry, LineBasicMaterial, Vector3, Quaternion, Raycaster } from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
-import { createRenderer, createCamera, createLights, createGround, createWalls, createStatsOverlay, createCrosshair, applySkybox } from './view'
+import { createRenderer, createCamera, createLights, createGround, createWalls, createStatsOverlay, createCrosshair, createHUD, applySkybox } from './view'
 import { createInput } from './systems/input'
 import { createPhysicsWorld } from './systems/physics'
 import { createPlayer } from './systems/player'
@@ -363,6 +363,8 @@ export async function bootstrap(): Promise<void> {
     }
     const stats = createStatsOverlay(appRoot)
     const crosshair = createCrosshair(appRoot)
+    const hud = createHUD(appRoot)
+    hud.update({ health: 100, stamina: 100 })
     
     // Update handleWeaponFire to flash crosshair
     const originalHandleWeaponFire = handleWeaponFire
@@ -371,7 +373,7 @@ export async function bootstrap(): Promise<void> {
       originalHandleWeaponFire()
     }
     
-    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, serverUrl, username, onFire: handleWeaponFireWithFlash, net })
+    const loop = createLoop({ renderer, scene, camera, physics, player, input, stats, hud, serverUrl, username, onFire: handleWeaponFireWithFlash, net })
     loop.start()
   })
   }

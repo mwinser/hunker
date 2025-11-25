@@ -86,6 +86,7 @@ export type CharacterController = {
     desiredVZ: number
     jump: boolean
   }) => void
+  isOnGround: () => boolean
 }
 
 export function createCapsuleCharacter(physics: Physics, position: { x: number; y: number; z: number }): CharacterController {
@@ -122,8 +123,15 @@ export function createCapsuleCharacter(physics: Physics, position: { x: number; 
   
   // Jump state tracking for edge detection
   let wasJumpPressed = false
+  let jumpCooldown = 0 // Cooldown timer to prevent rapid successive jumps
+  const jumpCooldownTime = 0.1 // 100ms cooldown after jumping
 
   const update = (dt: number, input: { desiredVX: number; desiredVZ: number; jump: boolean }) => {
+    // Update jump cooldown
+    if (jumpCooldown > 0) {
+      jumpCooldown -= dt
+    }
+    
     const linvel = body.linvel()
     const position = body.translation()
 
@@ -170,18 +178,17 @@ export function createCapsuleCharacter(physics: Physics, position: { x: number; 
       const upDot = groundNormal.y
       slopeAngle = Math.acos(Math.max(-1, Math.min(1, upDot)))
       
-      // Check vertical velocity - must be low to be considered on ground
+      // Check vertical velocity - must be zero or negative (falling) to be considered on ground
       const verticalVelocity = linvel.y
-      const maxVerticalVelocityForGround = 0.5 // Allow small upward velocity for edge cases
       
-      // Consider on ground if:
+      // Consider on ground ONLY if:
       // 1. Slope is walkable
-      // 2. Close enough to ground
-      // 3. Not moving upward too fast (not already jumping)
+      // 2. Close enough to ground (with tighter tolerance)
+      // 3. NOT moving upward at all (vertical velocity must be <= 0)
       // 4. Ground is actually beneath the player (normal points mostly up)
       onGround = slopeAngle < maxSlopeAngle && 
-                 minDistance < groundCheckDistance &&
-                 verticalVelocity <= maxVerticalVelocityForGround &&
+                 minDistance < groundCheckDistance * 0.7 && // Tighter distance check
+                 verticalVelocity <= 0 && // CRITICAL: Must not be moving upward
                  upDot > 0.5 // Ground normal should point mostly upward
     }
 
@@ -256,13 +263,18 @@ export function createCapsuleCharacter(physics: Physics, position: { x: number; 
 
     // Jump handling - only trigger on edge (press, not hold)
     const jumpPressed = input.jump && !wasJumpPressed
-    if (jumpPressed && onGround) {
+    if (jumpPressed && onGround && jumpCooldown <= 0) {
       body.applyImpulse({ x: 0, y: jumpImpulse * body.mass(), z: 0 }, true)
+      jumpCooldown = jumpCooldownTime // Set cooldown after jumping
     }
     wasJumpPressed = input.jump
   }
 
-  return { body, update }
+  return { 
+    body, 
+    update,
+    isOnGround: () => onGround
+  }
 }
 
 
