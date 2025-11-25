@@ -68,7 +68,7 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
       const ipInput = document.createElement('input')
       ipInput.type = 'text'
       ipInput.placeholder = '192.168.1.100 or localhost'
-      ipInput.value = 'localhost'
+      ipInput.value = '192.168.12.76'
       ipInput.style.cssText = `
         padding: 0.75rem;
         border: 1px solid #444;
@@ -107,10 +107,34 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
       `
       discoveryStatus.textContent = 'Searching for servers on local network...'
 
+      // Helper function to test a single IP connection
+      const testConnection = async (ip: string, port: number = 8787): Promise<boolean> => {
+        const timeout = 100
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), timeout)
+          
+          const response = await fetch(`http://${ip}:${port}/discover`, {
+            method: 'GET',
+            signal: controller.signal,
+            mode: 'cors'
+          })
+          
+          clearTimeout(timeoutId)
+          
+          if (response.ok) {
+            const data = await response.json()
+            return data.name === 'Hunker Game Server'
+          }
+          return false
+        } catch {
+          return false
+        }
+      }
+
       // Server discovery function - scan all 192.168.x.x IPs
       const discoverServers = async (port: string): Promise<string | null> => {
         const testPort = parseInt(port) || 8787
-        const timeout = 100 // ms per HTTP request (faster than WebSocket)
 
         // Get local IP hints from WebRTC (if available)
         const getLocalIPs = async (): Promise<string[]> => {
@@ -145,36 +169,17 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
           }
         }
 
-        // Test HTTP discovery endpoint (much faster than WebSocket)
-        const testConnection = async (ip: string): Promise<boolean> => {
-          try {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), timeout)
-            
-            const response = await fetch(`http://${ip}:${testPort}/discover`, {
-              method: 'GET',
-              signal: controller.signal,
-              mode: 'cors'
-            })
-            
-            clearTimeout(timeoutId)
-            
-            if (response.ok) {
-              const data = await response.json()
-              return data.name === 'Hunker Game Server'
-            }
-            return false
-          } catch {
-            return false
-          }
-        }
-
         // Try localhost first (fastest)
-        if (await testConnection('localhost')) {
+        if (await testConnection('localhost', testPort)) {
           return 'localhost'
         }
-        if (await testConnection('127.0.0.1')) {
+        if (await testConnection('127.0.0.1', testPort)) {
           return '127.0.0.1'
+        }
+        
+        // Try the default IP (192.168.12.76) early
+        if (await testConnection('192.168.12.76', testPort)) {
+          return '192.168.12.76'
         }
 
         // Get all 192.168.x.x IPs to check
@@ -225,7 +230,7 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
         let tested = 0
         for (let i = 0; i < uniqueIPs.length; i += batchSize) {
           const batch = uniqueIPs.slice(i, i + batchSize)
-          const results = await Promise.all(batch.map(ip => testConnection(ip)))
+          const results = await Promise.all(batch.map(ip => testConnection(ip, testPort)))
           tested += batch.length
           for (let j = 0; j < batch.length; j++) {
             if (results[j]) {
@@ -243,14 +248,29 @@ export function createConnectionUI(container: HTMLElement): ConnectionUI {
 
       // Start discovery
       const startDiscovery = async () => {
-        const discoveredIP = await discoverServers(portInput.value)
-        if (discoveredIP) {
-          ipInput.value = discoveredIP
-          discoveryStatus.textContent = `✓ Found server at ${discoveredIP}`
+        const defaultIP = ipInput.value // Remember the default
+        const testPort = parseInt(portInput.value) || 8787
+        
+        // First, quickly check if the default IP works
+        const defaultIPWorks = await testConnection(defaultIP, testPort)
+        if (defaultIPWorks) {
+          discoveryStatus.textContent = `✓ Default server at ${defaultIP} is available`
           discoveryStatus.style.color = '#4ade80'
         } else {
-          discoveryStatus.textContent = 'No servers found. Enter server IP manually.'
-          discoveryStatus.style.color = '#aaa'
+          // Default doesn't work, try to discover other servers
+          discoveryStatus.textContent = 'Default server not found. Searching for other servers...'
+          const discoveredIP = await discoverServers(portInput.value)
+          
+          if (discoveredIP && discoveredIP !== defaultIP) {
+            // Found a different server, use it
+            ipInput.value = discoveredIP
+            discoveryStatus.textContent = `✓ Found server at ${discoveredIP}`
+            discoveryStatus.style.color = '#4ade80'
+          } else {
+            // No other servers found, keep default but warn
+            discoveryStatus.textContent = `No servers found. Using default IP ${defaultIP} - check if server is running.`
+            discoveryStatus.style.color = '#fbbf24'
+          }
         }
       }
 
