@@ -88,14 +88,14 @@ export function createPlayer(args: { scene: import('three').Scene; camera: Persp
   topBlock.position.set(0, blockHeight * 0.5, 0) // Center at y = 0.45, spans y = 0 to y = 0.9
   playerRoot.add(topBlock)
   
-  // Front mark (on the front face of the bottom block, indicating forward direction)
+  // Front mark (on the front face of the top block, indicating forward direction)
   const markMaterial = new MeshStandardMaterial({ color: 0xff0000 })
   const markSize = 0.15
   const mark = new Mesh(
     new BoxGeometry(markSize, markSize, 0.02),
     markMaterial
   )
-  mark.position.set(0, -blockHeight * 0.5, -blockSize * 0.5 - 0.01) // On front face (-Z), slightly forward
+  mark.position.set(0, blockHeight * 0.5, -blockSize * 0.5 - 0.01) // On front face (-Z) of top block, slightly forward
   playerRoot.add(mark)
 
   playerRoot.add(camera)
